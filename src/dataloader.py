@@ -3,21 +3,12 @@ import pandas as pd
 class Dataloader:
     @staticmethod
     def _parse_stupid_format(file):
-        sid_lst, pid_lst, rating_lst = [], [], []
-        with open(file) as f:
-            f.readline()
-            for line in f.readlines():
-                line = line.strip()
-                sid, second = line.split('_')
-                pid, rating = second.split(',')
-                sid_lst.append(int(sid))
-                pid_lst.append(int(pid))
-                rating_lst.append(int(rating))
-        return pd.DataFrame({
-            'sid': sid_lst,
-            'pid': pid_lst,
-            'rating': rating_lst
-        })
+        df = pd.read_csv(file)
+        df[["sid", "pid"]] = df["sid_pid"].str.split("_", expand=True)
+        df = df.drop("sid_pid", axis=1)
+        df["sid"] = df["sid"].astype(int)
+        df["pid"] = df["pid"].astype(int)
+        return df
 
     @staticmethod
     def load_train_ratings(path="data/train_ratings.csv"):
@@ -31,3 +22,11 @@ class Dataloader:
     @staticmethod
     def load_sample_submission(path="data/sample_submission.csv"):
         return Dataloader._parse_stupid_format(path)
+    
+    @staticmethod
+    def make_submission(pred_fn, sample_submission_path = "data/sample_submission.csv"):
+        df = Dataloader.load_sample_submission(sample_submission_path)
+        sids = df["sid"].values
+        pids = df["pid"].values
+        df["rating"] = pred_fn(sids, pids)
+        df.to_csv(sample_submission_path, index=False)
