@@ -1,8 +1,8 @@
 
-SVD++ estimate:
+## SVD++ estimate:
 $$\hat{r}_{ui} = \mu + b_u + b_i + q_i^T \left( p_u + |N(u)|^{-\frac{1}{2}} \sum_{j \in N(u)} y_j \right)$$
 
-SVD++ MLP estimate:
+## SVD++ MLP estimate:
 $$\hat{r}_{ui} = \mu + b_u + b_i + q_i^T \left( \mathbf{gate} \left( p_u, \mathbf{MLP} \left(|N(u)|^{-\frac{1}{2}} \sum_{j \in N(u)} y_j \right) \right) \right)$$
 
 where 
