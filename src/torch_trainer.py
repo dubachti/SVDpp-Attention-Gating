@@ -134,7 +134,7 @@ class SVDppTrainer:
             best validation RMSE
         """
         if self.verbose:
-            print(f"Starting {self.model.__name__} training on {self.device} for {num_epochs} epochs...")
+            print(f"Starting training on {self.device} for {num_epochs} epochs...")
             print(f"Optimizer: {type(self.optimizer).__name__}, LR: {self.optimizer.defaults.get('lr', 'N/A')}")
             print(f"Regularization Lambda: {self.reg_lambda}")
 
