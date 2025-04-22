@@ -50,7 +50,7 @@ def run_grid_search():
     # build datasets and dataloaders
     print("Creating datasets and dataloaders...")
     train_dataset = SVDppDataset(ratings_train, tbr_df)
-    valid_dataset = SVDppDataset(ratings_valid)
+    valid_dataset = SVDppDataset(ratings_valid, tbr_df)
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True,
                               collate_fn=svdpp_collate_fn, num_workers=NUM_WORKERS, pin_memory=True if device == 'cuda' else False)
