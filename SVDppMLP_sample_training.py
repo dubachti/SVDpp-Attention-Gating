@@ -2,6 +2,8 @@ from src.torch_dataset import SVDppDataset, svdpp_collate_fn
 from src.torch_models import SVDpp, SVDppMLP
 from src.torch_trainer import SVDppTrainer
 from src.dataloader import Dataloader as CSVLoader
+from src.eval import predict_SVDpp
+from datetime import datetime
 from torch import nn
 import torch
 from torch.utils.data import DataLoader
@@ -32,19 +34,19 @@ def main():
     REG_LAMBDA = 0.01
     NUM_EPOCHS = 8
 
-    svdpp = SVDppMLP(
+    model = SVDppMLP(
         num_scientists=train_dataset.num_scientists,
         num_papers=train_dataset.num_papers,
         embedding_dim=EMBEDDING_DIM,
         global_mean=train_dataset.global_mean
     ).to(device)
 
-    optimizer = optim.Adam(svdpp.parameters(), lr=LEARNING_RATE)
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     criterion = nn.MSELoss(reduction='sum')
 
     # 4. train
     trainer = SVDppTrainer(
-        model=svdpp,
+        model=model,
         optimizer=optimizer,
         criterion=criterion,
         reg_lambda=REG_LAMBDA,
@@ -56,6 +58,24 @@ def main():
     trainer.train(num_epochs=NUM_EPOCHS)
 
     trainer.save_model("svdpp_mlp_model.pth")
+
+    # 5. predict
+    print("Predicting...")
+    submission_df = CSVLoader.load_sample_submission()
+
+    out = predict_SVDpp(model=model,
+                        sids=submission_df['sid'].values,
+                        pids=submission_df['pid'].values,
+                        device=device)
+    submission_df['rating'] = out
+    submission_df['rating'] = submission_df['rating'].clip(1, 5)
+
+    datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    with open(f'{datetime_str}_submission.csv', 'w') as f:
+        f.write('sid_pid,rating\n')
+        for i, row in submission_df.iterrows():
+            f.write(f'{int(row["sid"])}_{int(row["pid"])},{row["rating"]}\n')
+
 
 if __name__ == "__main__":
     main()
