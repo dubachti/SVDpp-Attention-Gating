@@ -73,9 +73,10 @@ def main():
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     with open(f'{datetime_str}_submission.csv', 'w') as f:
         f.write('sid_pid,rating\n')
-        for i, row in submission_df.iterrows():
+        for _, row in submission_df.iterrows():
             f.write(f'{int(row["sid"])}_{int(row["pid"])},{row["rating"]}\n')
 
+    print(f"Submission file created: {datetime_str}_submission.csv")
 
 if __name__ == "__main__":
     main()
