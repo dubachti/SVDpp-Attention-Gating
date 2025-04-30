@@ -29,7 +29,12 @@ class SVDpp(nn.Module):
     embedding_dim : int
         Dimensionality of the embedding.
     """
-    def __init__(self, num_scientists: int, num_papers: int, embedding_dim: int, global_mean: float):
+    def __init__(self, 
+                 num_scientists: int, 
+                 num_papers: int, 
+                 embedding_dim: int, 
+                 global_mean: float,
+                sparse_grad: bool = True):
         super().__init__()
 
         self.num_scientists = num_scientists
@@ -38,15 +43,15 @@ class SVDpp(nn.Module):
         self.global_mean = global_mean
 
         # scientist factors
-        self.P = nn.Embedding(num_scientists, embedding_dim)
+        self.P = nn.Embedding(num_scientists, embedding_dim, sparse=sparse_grad)
         # paper factor
-        self.Q = nn.Embedding(num_papers, embedding_dim)
+        self.Q = nn.Embedding(num_papers, embedding_dim, sparse=sparse_grad)
         # implicit paper factors
-        self.Y = nn.Embedding(num_papers, embedding_dim)
+        self.Y = nn.Embedding(num_papers, embedding_dim, sparse=sparse_grad)
         # scientist bias
-        self.Bs = nn.Embedding(num_scientists, 1)
+        self.Bs = nn.Embedding(num_scientists, 1, sparse=sparse_grad)
         # paper bias
-        self.Bp = nn.Embedding(num_papers, 1)
+        self.Bp = nn.Embedding(num_papers, 1, sparse=sparse_grad)
 
         self._init_weights()
 
@@ -133,6 +138,7 @@ class SVDppMLP(nn.Module):
                  global_mean: float,
                  use_gating: bool = True,
                  MLP_layers: int = 1,
+                 sparse_grad: bool = True,
         ):
         super().__init__()
 
@@ -143,15 +149,15 @@ class SVDppMLP(nn.Module):
         self.use_gating = use_gating
 
         # scientist factors
-        self.P = nn.Embedding(num_scientists, embedding_dim)
+        self.P = nn.Embedding(num_scientists, embedding_dim, sparse=sparse_grad)
         # paper factor
-        self.Q = nn.Embedding(num_papers, embedding_dim)
+        self.Q = nn.Embedding(num_papers, embedding_dim, sparse=sparse_grad)
         # implicit paper factors
-        self.Y = nn.Embedding(num_papers, embedding_dim)
+        self.Y = nn.Embedding(num_papers, embedding_dim, sparse=sparse_grad)
         # scientist bias
-        self.Bs = nn.Embedding(num_scientists, 1)
+        self.Bs = nn.Embedding(num_scientists, 1, sparse=sparse_grad)
         # paper bias
-        self.Bp = nn.Embedding(num_papers, 1)
+        self.Bp = nn.Embedding(num_papers, 1, sparse=sparse_grad)
         # MLP for implicit signal
         self.implicit_MLP = nn.Sequential(
                 nn.Linear(embedding_dim, embedding_dim),
