@@ -7,6 +7,7 @@ from tqdm import tqdm
 import math
 import copy
 import os
+import time
 
 from .torch_models import *
 
@@ -22,6 +23,7 @@ class SVDppTrainer:
                  device: torch.device,
                  train_loader: DataLoader,
                  valid_loader: DataLoader,
+                 scheduler: optim.lr_scheduler = None,
                  rating_range = (1.0, 5.0),
                  verbose=True):
 
@@ -32,6 +34,7 @@ class SVDppTrainer:
         self.device = device
         self.train_loader = train_loader
         self.valid_loader = valid_loader
+        self.scheduler = scheduler
         self.rating_range = rating_range
         self.rating_min, self.rating_max = rating_range
         self.verbose = verbose
@@ -144,8 +147,10 @@ class SVDppTrainer:
         self.best_model_state = None
 
         for epoch in tqdm(range(num_epochs), desc="Training", disable=self.verbose, leave=False):
+            start_time = time.time()
             train_rmse = self._train_epoch()
             valid_rmse = self._evaluate()
+            end_time = time.time()
             # save best model state (in memory)
             if valid_rmse < self.best_valid_rmse:
                 self.best_valid_rmse = valid_rmse
@@ -155,13 +160,21 @@ class SVDppTrainer:
             if self.verbose:
                 print(f"[Epoch {epoch+1}/{num_epochs}] "
                       f"Train RMSE: {train_rmse:.4f}, "
-                      f"Validation RMSE: {valid_rmse:.4f}")
+                      f"Validation RMSE: {valid_rmse:.4f}, "
+                      f"LR: {self.optimizer.param_groups[0]['lr']:.6f}, "
+                      f"Duration: {end_time - start_time:.2f}s")
+            
+            if self.scheduler:
+                if isinstance(self.scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+                    self.scheduler.step(valid_rmse)
+                else:
+                    self.scheduler.step()
 
         # load the best model
         if self.best_model_state is not None:
             self.model.load_state_dict(self.best_model_state)
             if self.verbose:
-                print(f"Loaded model of epoch {self.best_valid_rmse_epoch} with best validation RMSE: {self.best_valid_rmse:.4f}")
+                print(f"Loaded model of epoch {self.best_valid_rmse_epoch+1} with best validation RMSE: {self.best_valid_rmse:.4f}")
         else:
              if self.verbose:
                 print("no improvement during training, probably something wrong")
