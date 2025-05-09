@@ -25,6 +25,8 @@ class SVDppTrainer:
                  valid_loader: DataLoader,
                  scheduler: optim.lr_scheduler = None,
                  rating_range = (1.0, 5.0),
+                 early_stopping_patience: int = 5,
+                 min_delta: float = 0.0001,
                  verbose=True):
 
         self.model = model.to(device)
@@ -38,6 +40,10 @@ class SVDppTrainer:
         self.rating_range = rating_range
         self.rating_min, self.rating_max = rating_range
         self.verbose = verbose
+        # early stopping parameters
+        self.early_stopping_patience = early_stopping_patience
+        self.min_delta = min_delta
+        self.epochs_no_improve = 0
 
         self.best_model_state = None
         self.best_valid_rmse = float('inf')
@@ -140,17 +146,27 @@ class SVDppTrainer:
             print(f"Starting training on {self.device} for {num_epochs} epochs...")
             print(f"Optimizer: {type(self.optimizer).__name__}, LR: {self.optimizer.defaults.get('lr', 'N/A')}")
             print(f"Regularization Lambda: {self.reg_lambda}")
+            if self.early_stopping_patience > 0:
+                print(f"Early stopping enabled: patience={self.early_stopping_patience}, min_delta={self.min_delta}")
 
-        # reset best RMSE
+        # reset best RMSE and early stopping parameters
         self.best_valid_rmse = float('inf')
         self.best_valid_rmse_epoch = 0
         self.best_model_state = None
+        self.epochs_no_improve = 0
 
         for epoch in tqdm(range(num_epochs), desc="Training", disable=self.verbose, leave=False):
             start_time = time.time()
             train_rmse = self._train_epoch()
             valid_rmse = self._evaluate()
             end_time = time.time()
+
+            #  check early stopping condition
+            if valid_rmse < self.best_valid_rmse - self.min_delta:
+                self.epochs_no_improve = 0
+            else:
+                self.epochs_no_improve += 1
+
             # save best model state (in memory)
             if valid_rmse < self.best_valid_rmse:
                 self.best_valid_rmse = valid_rmse
@@ -169,6 +185,12 @@ class SVDppTrainer:
                     self.scheduler.step(valid_rmse)
                 else:
                     self.scheduler.step()
+
+            # time to stop
+            if self.early_stopping_patience > 0 and self.epochs_no_improve >= self.early_stopping_patience:
+                if self.verbose:
+                    print(f"Early stopping triggered after {epoch + 1} epochs due to no improvement for {self.early_stopping_patience} epochs.")
+                break
 
         # load the best model
         if self.best_model_state is not None:
