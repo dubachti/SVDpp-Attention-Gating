@@ -1,10 +1,10 @@
 import numpy as np
-from .torch_models import SVDpp, SVDppMLP
+from .torch_models import SVDpp
 from .dataloader import Dataloader as CSVLoader
 import torch
 import math
 
-def predict_SVDpp(model: SVDpp | SVDppMLP,
+def predict_SVDpp(model: SVDpp,
                   sids: list[int] | np.ndarray,
                   pids: list[int] | np.ndarray,
                   device: torch.device,
