@@ -237,3 +237,116 @@ class SVDppAG(nn.Module):
             if self.gate.bias is not None:
                 reg_loss += torch.sum(self.gate.bias**2)
         return reg_loss
+    
+
+
+
+
+class ALS:
+    def __init__(self, device, train_mat, tbr_df):
+        print(f"ALS: Using device {device}")
+        self.device = device
+
+        self.train_mat = train_mat
+        self.tbr_df = tbr_df
+
+        self.U = None
+        self.V = None
+
+
+
+    def predict_with_NaNs(self, train_mat, mean, std):
+
+        U = torch.randn(train_mat.shape[0], self.rank).to(self.device) * 0.01
+        V = torch.randn(train_mat.shape[1], self.rank).to(self.device) * 0.01
+
+        for i in range(self.iterations):
+            """if mean is not None and std is not None:
+                prediction_matrix = recover_matrix_rows((U @ V.T).cpu(), mean, std)
+            else:
+                prediction_matrix = (U @ V.T).cpu()"""
+
+            prediction_matrix = (U @ V.T).cpu()
+            #print("Loss:", self.evaluate_prediction_matrix(prediction_matrix))
+            U = self.optimize_U_with_NaNs(U, V, train_mat)
+            V = self.optimize_V_with_NaNs(U, V, train_mat)
+
+        self.U = U
+        self.V = V
+
+    
+    def optimize_U_with_NaNs(self, U, V, A):
+        assert U.shape[0] == A.shape[0] and U.shape[1] == V.shape[1] and V.shape[0] == A.shape[1]
+
+        n = U.shape[0]
+        m = V.shape[0]
+        rank = U.shape[1]
+
+        A_masked = torch.nan_to_num(A, nan=0.0)
+        B = V.T @ A_masked.T  # shape: (rank, n)
+        Id_lam = self.lam * torch.eye(rank, dtype=U.dtype, device=U.device)
+
+        # Precompute outer products V[i,:] @ V[i,:].T for all i
+        Q = V.unsqueeze(2) * V.unsqueeze(1)  # shape: (m, rank, rank)
+
+        for j in range(n):
+            # Start with lam * I
+            mat = Id_lam.clone()
+
+            valid_indices = (~torch.isnan(A[j, :])).nonzero(as_tuple=True)[0]
+
+            if valid_indices.numel() > 0:
+                mat += Q[valid_indices].sum(dim=0)
+
+            U[j] = torch.linalg.solve(mat, B[:, j])
+
+        return U
+    
+    def optimize_V_with_NaNs(self, U, V, A):
+        assert U.shape[0] == A.shape[0] and U.shape[1] == V.shape[1] and V.shape[0] == A.shape[1]
+
+        n = U.shape[0]
+        m = V.shape[0]
+        rank = U.shape[1]
+
+        A_masked = torch.nan_to_num(A, nan=0.0)
+        B = U.T @ A_masked  # shape: (rank, m)
+        Id_lam = self.lam * torch.eye(rank, dtype=U.dtype, device=U.device)
+
+        # Precompute outer products U[i,:] @ U[i,:].T for all i
+        Q = U.unsqueeze(2) * U.unsqueeze(1)  # shape: (m, rank, rank)
+
+        for j in range(m):
+            mat = Id_lam.clone()
+
+            valid_indices = (~torch.isnan(A[:, j])).nonzero(as_tuple=True)[0]
+            if valid_indices.numel() > 0:
+                mat += Q[valid_indices].sum(dim=0)
+
+            V[j] = torch.linalg.solve(mat, B[:, j])
+
+        return V
+    
+    """def evaluate_prediction_matrix(self, prediction_matrix):
+        pred_fn = lambda sids, pids: prediction_matrix[sids, pids]
+        val_score = self.evaluate(pred_fn)
+        return val_score"""
+    
+    """def evaluate(self, pred_fn) -> float:
+        from sklearn.metrics import root_mean_squared_error
+        preds = pred_fn(self.valid_df["sid"].values, self.valid_df["pid"].values)
+        return root_mean_squared_error(self.valid_df["rating"].values, preds)"""
+    
+
+
+    def train(self, lam, rank, iterations):
+        self.lam = lam
+        self.rank = rank
+        self.iterations = iterations
+
+        self.predict_with_NaNs(self.train_mat, None, None)
+
+
+    def get_predictions_matrix(self):
+        return self.U @ self.V.T
+    
