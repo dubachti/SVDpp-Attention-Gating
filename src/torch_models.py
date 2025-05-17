@@ -3,6 +3,228 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
+class BasicImplicitMF(nn.Module):
+    """
+    Basic Matrix Factorization with implicit feedback.
+    Dot product of scientist and paper latent factors,
+    plus bias terms for both scientists and papers.
+    """
+    def __init__(self,
+                 num_scientists: int,
+                 num_papers: int,
+                 embedding_dim: int,
+                 global_mean: float,
+                 dropout_rate: float = 0.1,
+                 implicit_weight: float = 0.2):
+        super().__init__()
+
+        self.num_scientists = num_scientists
+        self.num_papers = num_papers
+        self.embedding_dim = embedding_dim
+        self.global_mean = global_mean
+        self.implicit_weight = implicit_weight
+        # Scientist latent factors
+        self.scientist_embedding = nn.Embedding(num_scientists, embedding_dim)
+        # Paper latent factors
+        self.paper_embedding = nn.Embedding(num_papers, embedding_dim)
+        # Implicit paper factors (for TBR items)
+        self.implicit_embedding = nn.Embedding(num_papers, embedding_dim)
+        # Bias terms
+        self.scientist_bias = nn.Embedding(num_scientists, 1)
+        self.paper_bias = nn.Embedding(num_papers, 1)
+        # Dropout for regularization
+        self.dropout = nn.Dropout(dropout_rate)
+
+        self._init_weights()
+
+    def _init_weights(self):
+        nn.init.normal_(self.scientist_embedding.weight, mean=0.0, std=0.01)
+        nn.init.normal_(self.paper_embedding.weight, mean=0.0, std=0.01)
+        nn.init.normal_(self.implicit_embedding.weight, mean=0.0, std=0.01)
+        nn.init.zeros_(self.scientist_bias.weight)
+        nn.init.zeros_(self.paper_bias.weight)
+
+    def forward(self,
+                SIDs: torch.Tensor,  # (batch_size,)
+                PIDs: torch.Tensor,  # (batch_size,)
+                implicit_PIDs: torch.Tensor = None,  # (batch_size, max_implicit_len)
+                implicit_lengths: torch.Tensor = None  # (batch_size,)
+                ) -> torch.Tensor:
+        # Get scientist and paper embeddings
+        p_s = self.dropout(self.scientist_embedding(SIDs))  # (batch_size, embedding_dim)
+        q_p = self.dropout(self.paper_embedding(PIDs))  # (batch_size, embedding_dim)
+
+        # Get bias terms
+        b_s = self.scientist_bias(SIDs).squeeze(-1)  # (batch_size,)
+        b_p = self.paper_bias(PIDs).squeeze(-1)  # (batch_size,)
+
+        # Process implicit feedback (TBR items) if provided
+        if implicit_PIDs is not None and implicit_lengths is not None:
+            has_implicit = implicit_lengths > 0
+
+            if torch.any(has_implicit):
+                # Create mask for valid items
+                mask = torch.arange(implicit_PIDs.size(1), device=SIDs.device)[None, :] < implicit_lengths[:, None]
+                mask = mask.unsqueeze(-1).float()
+                # Get implicit embeddings and apply mask
+                y_j = self.implicit_embedding(implicit_PIDs)  # (batch_size, max_implicit_len, embedding_dim)
+                y_j = y_j * mask
+                # Sum the implicit embeddings
+                y_sum = y_j.sum(dim=1)  # (batch_size, embedding_dim)
+                # Normalize by square root of count
+                sqrt_lengths = torch.sqrt(implicit_lengths.float() + 1e-8)
+                norm_term = (1.0 / sqrt_lengths).unsqueeze(-1)
+                y_norm = y_sum * norm_term
+                # Enhance user representation with implicit feedback
+                p_s = p_s + self.implicit_weight * y_norm
+
+        # Compute interaction term (dot product of latent factors)
+        interaction = torch.sum(p_s * q_p, dim=1)  # (batch_size,)
+        # Compute final prediction
+        prediction = self.global_mean + b_s + b_p + interaction  # (batch_size,)
+        return prediction
+
+    def get_l2_reg_loss(self) -> torch.Tensor:
+        reg_loss = torch.tensor(0., device=self.scientist_embedding.weight.device)
+        reg_loss += torch.sum(self.scientist_embedding.weight**2)
+        reg_loss += torch.sum(self.paper_embedding.weight**2)
+        reg_loss += torch.sum(self.implicit_embedding.weight**2)
+        reg_loss += 0.5 * torch.sum(self.scientist_bias.weight**2)
+        reg_loss += 0.5 * torch.sum(self.paper_bias.weight**2)
+        return reg_loss
+
+class AsymmetricSVD(nn.Module):
+    """
+    Asymmetric SVD that incorporates implicit feedback differently than SVD++
+
+    Instead of learning separate implicit item factors, ASVD uses the same
+    item factors for both explicit and implicit interactions.
+    """
+    def __init__(self,
+                 num_scientists: int,
+                 num_papers: int,
+                 embedding_dim: int,
+                 global_mean: float,
+                 implicit_weight: float = 0.5,
+                 dropout_rate: float = 0.1,
+                 sparse_grad: bool = True):
+        super().__init__()
+
+        self.num_scientists = num_scientists
+        self.num_papers = num_papers
+        self.embedding_dim = embedding_dim
+        self.global_mean = global_mean
+        self.implicit_weight = implicit_weight
+
+        # User latent factors
+        self.P = nn.Embedding(num_scientists, embedding_dim, sparse=sparse_grad)
+        # Item latent factors (used for both explicit and implicit)
+        self.Q = nn.Embedding(num_papers, embedding_dim, sparse=sparse_grad)
+        # Bias terms
+        self.scientist_bias = nn.Embedding(num_scientists, 1, sparse=sparse_grad)
+        self.paper_bias = nn.Embedding(num_papers, 1, sparse=sparse_grad)
+
+        self.dropout = nn.Dropout(dropout_rate)
+        self._init_weights()
+
+    def _init_weights(self):
+        nn.init.normal_(self.P.weight, mean=0.0, std=0.01)
+        nn.init.normal_(self.Q.weight, mean=0.0, std=0.01)
+        nn.init.zeros_(self.scientist_bias.weight)
+        nn.init.zeros_(self.paper_bias.weight)
+
+    def forward(self,
+                SIDs: torch.Tensor,
+                PIDs: torch.Tensor,
+                implicit_PIDs: torch.Tensor,
+                implicit_lengths: torch.Tensor) -> torch.Tensor:
+        # Get explicit embeddings
+        p_s = self.dropout(self.P(SIDs))
+        q_p = self.dropout(self.Q(PIDs))
+        b_s = self.scientist_bias(SIDs).squeeze(-1)
+        b_p = self.paper_bias(PIDs).squeeze(-1)
+        # Process implicit feedback using the main item embeddings
+        mask = torch.arange(implicit_PIDs.size(1), device=implicit_PIDs.device)[None, :] < implicit_lengths[:, None]
+        mask = mask.unsqueeze(-1).float()
+        # Get implicit item embeddings (using same Q as explicit)
+        implicit_q = self.Q(implicit_PIDs)
+        implicit_q = implicit_q * mask
+        # Sum and normalize
+        implicit_sum = implicit_q.sum(dim=1)
+        sqrt_lengths = (implicit_lengths.float().sqrt() + 1e-9)
+        norm_term = (1.0 / sqrt_lengths).unsqueeze(-1)
+        implicit_factors = implicit_sum * norm_term
+        # Combine user factors with weighted implicit factors
+        user_representation = p_s + self.implicit_weight * implicit_factors
+        # Compute final prediction
+        interaction = torch.sum(q_p * user_representation, dim=1)
+        prediction = self.global_mean + b_s + b_p + interaction
+
+        return prediction
+
+    def get_l2_reg_loss(self):
+        reg_loss = torch.tensor(0., device=self.P.weight.device)
+        reg_loss += torch.sum(self.P.weight**2)
+        reg_loss += torch.sum(self.Q.weight**2)
+        reg_loss += torch.sum(self.scientist_bias.weight**2) * 0.5
+        reg_loss += torch.sum(self.paper_bias.weight**2) * 0.5
+        return reg_loss
+
+class BasicMF(nn.Module):
+    """
+    This model learns latent factors for scientists and papers along with bias terms
+    and predicts ratings as: global_mean + scientist_bias + paper_bias + dot(scientist_factors, paper_factors)
+    """
+    def __init__(self,
+                 num_scientists: int,
+                 num_papers: int,
+                 embedding_dim: int,
+                 global_mean: float,
+                 dropout_rate: float = 0.1,
+                 sparse_grad: bool = True):
+        super().__init__()
+
+        self.num_scientists = num_scientists
+        self.num_papers = num_papers
+        self.embedding_dim = embedding_dim
+        self.global_mean = global_mean
+        # Scientist latent factors
+        self.P = nn.Embedding(num_scientists, embedding_dim, sparse=sparse_grad)
+        # Paper latent factors
+        self.Q = nn.Embedding(num_papers, embedding_dim, sparse=sparse_grad)
+        # Bias terms
+        self.scientist_bias = nn.Embedding(num_scientists, 1, sparse=sparse_grad)
+        self.paper_bias = nn.Embedding(num_papers, 1, sparse=sparse_grad)
+        # Dropout for regularization
+        self.dropout = nn.Dropout(dropout_rate)
+        self._init_weights()
+
+    def _init_weights(self):
+        nn.init.normal_(self.P.weight, mean=0.0, std=0.01)
+        nn.init.normal_(self.Q.weight, mean=0.0, std=0.01)
+        nn.init.zeros_(self.scientist_bias.weight)
+        nn.init.zeros_(self.paper_bias.weight)
+
+    def forward(self,
+                SIDs: torch.Tensor,  # (batch_size,)
+                PIDs: torch.Tensor,  # (batch_size,)
+                *args, **kwargs) -> torch.Tensor:
+        p_s = self.dropout(self.P(SIDs))  # (batch_size, embedding_dim)
+        q_p = self.dropout(self.Q(PIDs))  # (batch_size, embedding_dim)
+        b_s = self.scientist_bias(SIDs).squeeze(-1)  # (batch_size,)
+        b_p = self.paper_bias(PIDs).squeeze(-1)  # (batch_size,)
+        interaction = torch.sum(p_s * q_p, dim=1)  # (batch_size,)
+        prediction = self.global_mean + b_s + b_p + interaction  # (batch_size,)
+        return prediction
+
+    def get_l2_reg_loss(self) -> torch.Tensor:
+        reg_loss = torch.tensor(0., device=self.P.weight.device)
+        reg_loss += torch.sum(self.P.weight**2)
+        reg_loss += torch.sum(self.Q.weight**2)
+        reg_loss += 0.5 * torch.sum(self.scientist_bias.weight**2)
+        reg_loss += 0.5 * torch.sum(self.paper_bias.weight**2)
+        return reg_loss
+
 class SVDpp(nn.Module):
     """
     SVD++ 
