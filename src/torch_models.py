@@ -475,27 +475,17 @@ class ALS:
         self.U = None
         self.V = None
 
-
-
     def predict_with_NaNs(self, train_mat, mean, std):
 
         U = torch.randn(train_mat.shape[0], self.rank).to(self.device) * 0.01
         V = torch.randn(train_mat.shape[1], self.rank).to(self.device) * 0.01
 
         for i in range(self.iterations):
-            """if mean is not None and std is not None:
-                prediction_matrix = recover_matrix_rows((U @ V.T).cpu(), mean, std)
-            else:
-                prediction_matrix = (U @ V.T).cpu()"""
-
-            prediction_matrix = (U @ V.T).cpu()
-            #print("Loss:", self.evaluate_prediction_matrix(prediction_matrix))
             U = self.optimize_U_with_NaNs(U, V, train_mat)
             V = self.optimize_V_with_NaNs(U, V, train_mat)
 
         self.U = U
         self.V = V
-
     
     def optimize_U_with_NaNs(self, U, V, A):
         assert U.shape[0] == A.shape[0] and U.shape[1] == V.shape[1] and V.shape[0] == A.shape[1]
@@ -549,25 +539,12 @@ class ALS:
 
         return V
     
-    """def evaluate_prediction_matrix(self, prediction_matrix):
-        pred_fn = lambda sids, pids: prediction_matrix[sids, pids]
-        val_score = self.evaluate(pred_fn)
-        return val_score"""
-    
-    """def evaluate(self, pred_fn) -> float:
-        from sklearn.metrics import root_mean_squared_error
-        preds = pred_fn(self.valid_df["sid"].values, self.valid_df["pid"].values)
-        return root_mean_squared_error(self.valid_df["rating"].values, preds)"""
-    
-
-
     def train(self, lam, rank, iterations):
         self.lam = lam
         self.rank = rank
         self.iterations = iterations
 
         self.predict_with_NaNs(self.train_mat, None, None)
-
 
     def get_predictions_matrix(self):
         return self.U @ self.V.T

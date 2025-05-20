@@ -4,9 +4,12 @@ from sklearn.model_selection import train_test_split
 from src.dataloader import Dataloader
 from src.torch_models import ALS
 import src.ALS_helpers as ALS_helpers
+import pandas as pd
 
-LAMBDAS = [1.0, 2.0, 5.0, 10.0]
-RANKS = [5, 7, 10, 15]
+RESULTS_FILE = "gs_results/ALS_grid_search.csv"
+
+LAMBDAS = [0.5, 1.0, 2.0, 5.0, 10.0]
+RANKS = [2, 4, 8, 16, 32, 64]
 ITERATIONS = [30]
 normalize_rows = False
 normalize_columns = True
@@ -42,6 +45,7 @@ def main():
     print(" > STARTING GRID SEARCH...")
     min_loss = float("inf")
     best_params = ""
+    results_list = []
     for lam in LAMBDAS:
         for rank in RANKS:
             for iterations in ITERATIONS:
@@ -64,13 +68,31 @@ def main():
                     best_predictions_matrix = predictions_matrix
                     best_params = current_params
 
+                params_dict = {}
+                params_dict["lambda"] = lam
+                params_dict["rank"] = rank
+                params_dict["iterations"] = iterations
+                params_dict["loss"] = loss
+                results_list.append(params_dict)
+
     print(f" > GRID SEARCH END: best parameters are {best_params} with loss={min_loss}")
 
 
+    # Save parameter configuration and losses to a CSV file
+    results_df = pd.DataFrame(results_list)
+    try:
+        results_df.to_csv(RESULTS_FILE, index=False)
+        print(f"\nGrid search results saved to {RESULTS_FILE}")
+    except IOError as e:
+        print(f"Error saving results to CSV: {e}")
+    except Exception as e:
+        print(f"An error occurred while processing results: {e}")
+
+
     # Create submission
-    print(" > CREATING SUBMISSION...")
+    """print(" > CREATING SUBMISSION...")
     pred_fn = lambda sids, pids: best_predictions_matrix[sids, pids]
-    ALS_helpers.make_submission(pred_fn, "ALS_submission.csv")
+    ALS_helpers.make_submission(pred_fn, "ALS_submission.csv")"""
 
     print(" > END")
 
