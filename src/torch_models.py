@@ -466,7 +466,6 @@ class SVDppAG(nn.Module):
 
 class ALS:
     def __init__(self, device, train_mat, tbr_df):
-        print(f"ALS: Using device {device}")
         self.device = device
 
         self.train_mat = train_mat

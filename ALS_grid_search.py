@@ -15,20 +15,36 @@ normalize_rows = False
 normalize_columns = True
 
 
+def evaluate_model(model, lam, rank, iterations, mean, std, ratings_valid):
+    
+    model.train(lam=lam, rank=rank, iterations=iterations)
+    predictions_matrix = model.get_predictions_matrix()
+
+    if normalize_rows:
+        predictions_matrix = ALS_helpers.recover_matrix_rows(predictions_matrix, mean, std)
+    elif normalize_columns:
+        predictions_matrix = ALS_helpers.recover_matrix_columns(predictions_matrix, mean, std)
+
+    loss = ALS_helpers.evaluate_prediction_matrix(ratings_valid, predictions_matrix)
+    return loss
+    
+
+
 def main():
     # Load data
-    print(" > READING DATA...")
+    print(" > Reading data...")
     ratings_df = Dataloader.load_train_ratings()
-    ratings_train, ratings_test = train_test_split(ratings_df, test_size=0.25, random_state=42)
+    ratings_train_valid, ratings_test = train_test_split(ratings_df, test_size=0.1, random_state=42)
+    ratings_train, ratings_valid = train_test_split(ratings_train_valid, test_size=0.1/0.9, random_state=42)
     init_train_mat = torch.tensor(ratings_train.pivot(index="sid", columns="pid", values="rating").values, dtype=torch.float32)
-    print(" > DATA READ")
+    print(" > Data read completed")
 
     if normalize_rows:
         train_mat, mean, std = ALS_helpers.center_and_normalize_rows(init_train_mat)
-        print(" > Normalized and centered each column")
+        print("(Normalized and centered each column)")
     elif normalize_columns:
         train_mat, mean, std = ALS_helpers.center_and_normalize_columns(init_train_mat)
-        print(" > Normalized and centered each row")
+        print("(Normalized and centered each row)")
     else:
         train_mat = init_train_mat
 
@@ -44,28 +60,22 @@ def main():
     # Grid search over model parameters
     print(" > STARTING GRID SEARCH...")
     min_loss = float("inf")
-    best_params = ""
+    best_params = {}
     results_list = []
     for lam in LAMBDAS:
         for rank in RANKS:
             for iterations in ITERATIONS:
                 
-                current_params = f"lambda={lam}, rank={rank}, iterations={iterations}"
+                current_params = {}
+                current_params["lambda"] = lam
+                current_params["rank"] = rank
+                current_params["iterations"] = iterations
                 print(f"  - Parameters: {current_params}")
-                model.train(lam=lam, rank=rank, iterations=iterations)
-                predictions_matrix = model.get_predictions_matrix()
 
-                if normalize_rows:
-                    predictions_matrix = ALS_helpers.recover_matrix_rows(predictions_matrix, mean, std)
-                elif normalize_columns:
-                    predictions_matrix = ALS_helpers.recover_matrix_columns(predictions_matrix, mean, std)
-
-                loss = ALS_helpers.evaluate_prediction_matrix(ratings_test, predictions_matrix)
+                loss = evaluate_model(model, lam, rank, iterations, mean, std, ratings_valid)
                 print(f"    => LOSS: {loss}")
-
                 if loss < min_loss:
                     min_loss = loss
-                    best_predictions_matrix = predictions_matrix
                     best_params = current_params
 
                 params_dict = {}
@@ -77,6 +87,23 @@ def main():
 
     print(f" > GRID SEARCH END: best parameters are {best_params} with loss={min_loss}")
 
+
+    # Retrain model with best parameters on ratings_train + ratings_valid and evaluate on ratings_test
+    train_valid_mat = torch.tensor(ratings_train_valid.pivot(index="sid", columns="pid", values="rating").values, dtype=torch.float32)
+    if normalize_rows:
+        train_valid_mat, mean, std = ALS_helpers.center_and_normalize_rows(train_valid_mat)
+        print("(Normalized and centered each column)")
+    elif normalize_columns:
+        train_valid_mat, mean, std = ALS_helpers.center_and_normalize_columns(train_valid_mat)
+        print("(Normalized and centered each row)")
+
+    model = ALS(
+        device="cuda" if torch.cuda.is_available() else "cpu",
+        train_mat=train_valid_mat,
+        tbr_df=None
+    )
+    test_loss = evaluate_model(model, best_params["lambda"], best_params["rank"], best_params["iterations"], mean, std, ratings_test)
+    print(f" >>> LOSS WITH {best_params} ON TEST DATA: {test_loss}")
 
     # Save parameter configuration and losses to a CSV file
     results_df = pd.DataFrame(results_list)
