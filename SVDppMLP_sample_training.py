@@ -1,5 +1,5 @@
 from src.torch_dataset import SVDppDataset, svdpp_collate_fn
-from src.torch_models import SVDpp, SVDppMLP
+from src.torch_models import SVDpp
 from src.torch_trainer import SVDppTrainer
 from src.dataloader import Dataloader as CSVLoader
 from src.eval import predict_SVDpp
@@ -12,13 +12,15 @@ from sklearn.model_selection import train_test_split as sklearn_split
 
 def main():
     # 1. load data
+    print(" > READING DATA...")
     ratings_df = CSVLoader.load_train_ratings()
     tbr_df = CSVLoader.load_train_tbr()
 
     ratings_train, ratings_test = sklearn_split(ratings_df, test_size=0.25, random_state=42)
-
+    print(" > DATA READ")
 
     # 2. build datasets and dataloaders
+    print(" > LOADING DATA...")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     BATCH_SIZE = 1024
 
@@ -27,6 +29,7 @@ def main():
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=svdpp_collate_fn, num_workers=2)
     valid_loader = DataLoader(valid_dataset, batch_size=BATCH_SIZE*2, shuffle=False, collate_fn=svdpp_collate_fn, num_workers=2)
+    print(" > DATA LOADED")
 
     # 3. hyperparams
     EMBEDDING_DIM = 30
@@ -34,7 +37,7 @@ def main():
     REG_LAMBDA = 0.01
     NUM_EPOCHS = 8
 
-    model = SVDppMLP(
+    model = SVDpp(
         num_scientists=train_dataset.num_scientists,
         num_papers=train_dataset.num_papers,
         embedding_dim=EMBEDDING_DIM,
