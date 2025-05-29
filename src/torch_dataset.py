@@ -31,7 +31,7 @@ class SVDppDataset(Dataset):
         self.num_scientists = len(self.unique_sids)
         self.num_papers = len(self.unique_pids)
 
-        ### explicit data
+        # Explicit data
         self.sid_idx = torch.tensor(explicit_df['sid'].values, dtype=torch.long)
         self.pid_idx = torch.tensor(explicit_df['pid'].values, dtype=torch.long)
         self.ratings = torch.tensor(explicit_df['rating'].values, dtype=torch.float32)
@@ -39,7 +39,7 @@ class SVDppDataset(Dataset):
         self.global_mean = self.ratings.mean().item()
 
 
-        ### implicit data
+        # Implicit data
         implicit_groups = implicit_df.groupby('sid')['pid'].apply(list)
         self.implicit_map = {
             sid: torch.tensor(pids, dtype=torch.long)
@@ -56,25 +56,25 @@ class SVDppDataset(Dataset):
         pid = self.pid_idx[idx]
         rating = self.ratings[idx]
 
-        # get all implicit pids for the current sid
+        # Get all implicit pids for the current sid
         implicit_pids_for_s = self.implicit_map.get(sid.item(), self.empty_implicit)
 
         return sid, pid, rating, implicit_pids_for_s
     
 def svdpp_collate_fn(batch):
     """
-    collate function required by the implicite data
+    Collate function required by the implicite data
     """
-    # split the batch
+    # Split the batch
     sid_idx, pid_idx, ratings, implicit_pid_lists = zip(*batch)
 
-    # stack explicit data
-    sid_batch = torch.stack(sid_idx) # (batch_size,)
-    pid_batch = torch.stack(pid_idx) # (batch_size,)
-    rating_batch = torch.stack(ratings) # (batch_size,)
+    # Stack explicit data
+    sid_batch = torch.stack(sid_idx)
+    pid_batch = torch.stack(pid_idx)
+    rating_batch = torch.stack(ratings)
 
-    # pad implicit data
-    implicit_lengths = torch.tensor([len(pids) for pids in implicit_pid_lists], dtype=torch.long) # (batch_size,)
-    implicit_pids_batch = pad_sequence(implicit_pid_lists, batch_first=True) # (batch_size, max_length)
+    # Pad implicit data
+    implicit_lengths = torch.tensor([len(pids) for pids in implicit_pid_lists], dtype=torch.long)
+    implicit_pids_batch = pad_sequence(implicit_pid_lists, batch_first=True)
 
     return sid_batch, pid_batch, rating_batch, implicit_pids_batch, implicit_lengths

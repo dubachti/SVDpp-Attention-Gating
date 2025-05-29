@@ -1,6 +1,9 @@
 import pandas as pd
 
 class Dataloader:
+    """
+    Utility class providing static methods for loading, processing, and writing data files.
+    """
     @staticmethod
     def _parse_stupid_format(file):
         df = pd.read_csv(file)

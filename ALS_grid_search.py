@@ -10,29 +10,32 @@ import numpy as np
 RESULTS_FILE = "gs_results/ALS_grid_search.csv"
 save_to_file = False
 
-# These grid search parameters are based on a more coarse grid search done beforehand
-LAMBDAS = [17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0]
-RANKS = [12, 13, 14, 15, 16]
+# Parameters over which to perform grid search
+LAMBDAS = [16, 18, 20, 22, 24]
+RANKS = [4, 8, 12, 16, 20, 24]
 ITERATIONS = [50]
+
+# Enable normalization along either columns, rows, or none at all
 normalize_rows = False
 normalize_columns = True
 
 
 def evaluate_model(model, lam, rank, iterations, mean, std, ratings_valid):
     
+    # Train model and get predictions
     model.train(lam=lam, rank=rank, iterations=iterations)
     predictions_matrix = model.get_predictions_matrix()
 
+    # Recover initial ratings by reverting the normalization
     if normalize_rows:
         predictions_matrix = ALS_helpers.recover_matrix_rows(predictions_matrix, mean, std)
     elif normalize_columns:
         predictions_matrix = ALS_helpers.recover_matrix_columns(predictions_matrix, mean, std)
 
+    # Compute and return the loss of the current model
     loss = ALS_helpers.evaluate_prediction_matrix(ratings_valid, predictions_matrix)
     return loss
     
-
-
 def grid_search():
 
     # Load data
@@ -43,7 +46,7 @@ def grid_search():
     init_train_mat = torch.tensor(ratings_train.pivot(index="sid", columns="pid", values="rating").values, dtype=torch.float32)
     print(" > Data read completed")
 
-    
+    # Normalize and center data if enabled
     if normalize_rows:
         train_mat, mean, std = ALS_helpers.center_and_normalize_rows(init_train_mat)
         print("(Normalized and centered each row)")
@@ -53,14 +56,11 @@ def grid_search():
     else:
         train_mat, mean, std = init_train_mat, 0, 0
 
-
-    # Initialize model, TODO: use tbr list
+    # Initialize model
     model = ALS(
         device="cuda" if torch.cuda.is_available() else "cpu",
-        train_mat=train_mat,
-        tbr_df=None
+        train_mat=train_mat
     )
-
 
     # Grid search over model parameters
     print(" > STARTING GRID SEARCH...")
@@ -92,7 +92,6 @@ def grid_search():
 
     print(f" > GRID SEARCH END: best parameters are {best_params} with loss={min_loss}")
 
-
     # Save parameter configuration and losses to a CSV file
     if save_to_file:
         results_df = pd.DataFrame(results_list)
@@ -104,16 +103,9 @@ def grid_search():
         except Exception as e:
             print(f"An error occurred while processing results: {e}")
 
-
-    # Create submission
-    """print(" > CREATING SUBMISSION...")
-    pred_fn = lambda sids, pids: best_predictions_matrix[sids, pids]
-    ALS_helpers.make_submission(pred_fn, "ALS_submission.csv")"""
-
     print(" > GRID SEARCH END")
 
     return best_params
-
 
 def three_runs_with_best_params(best_params):
 
@@ -125,8 +117,7 @@ def three_runs_with_best_params(best_params):
     init_train_mat = torch.tensor(ratings_train.pivot(index="sid", columns="pid", values="rating").values, dtype=torch.float32)
     print(" > Data read completed")
 
-
-    # Normalize data
+    # Normalize and center data if enabled
     if normalize_rows:
         train_mat, mean, std = ALS_helpers.center_and_normalize_rows(init_train_mat)
         print("(Normalized and centered each row)")
@@ -135,7 +126,6 @@ def three_runs_with_best_params(best_params):
         print("(Normalized and centered each column)")
     else:
         train_mat, mean, std = init_train_mat, 0, 0
-
 
     # Train (on init_train_mat) and evaluate (on ratings_test) three times with new seed each time
     nof_runs = 3
@@ -147,16 +137,19 @@ def three_runs_with_best_params(best_params):
         np.random.seed(seed)
         model = ALS(
             device="cuda" if torch.cuda.is_available() else "cpu",
-            train_mat=train_mat,
-            tbr_df=None
+            train_mat=train_mat
         )
         test_loss = evaluate_model(model, best_params["lambda"], best_params["rank"], best_params["iterations"], mean, std, ratings_test)
         losses.append(test_loss)
         print(f" > LOSS WITH {best_params} ON TEST DATA: {test_loss}  [seed={seed}]")
 
+    # Print the average loss and standard deviation over all trained models
     print(f" >>> LOSS OVER {nof_runs} RUNS: mean={np.mean(losses)}, std={np.std(losses)}")
 
-
 if __name__ == "__main__":
+
+    # Run grid search over the pre-defined parameter space
     best_params = grid_search()
+
+    # Use the best parameters from grid search and evaluate the model
     three_runs_with_best_params(best_params)
