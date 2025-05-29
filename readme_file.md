@@ -39,9 +39,6 @@ This project contains an implementation of the SVDppAG model introduced in the p
 
 ### Key Features of SVDppAG
 
-  
-
-- **Implicit Feedback Support**: All neural models support incorporation of implicit feedback signals
 
 - **Flexible Architecture**: Modular design allowing easy experimentation with different model variants
 
@@ -91,7 +88,7 @@ The core SVD++ model predicts ratings using:
 
   
 
-$\hat{r}_{ui} = μ + b_u + b_i + q_i^T(p_u + |N(u)|^(-1/2) * Σ_{j∈N(u)} y_j)$
+$$\hat{r}_{ui} = μ + b_u + b_i + q_i^T(p_u + |N(u)|^(-1/2) * Σ_{j∈N(u)} y_j)$$
 
   
 
@@ -113,7 +110,7 @@ Where:
 
   
 
-The system expects the following data formats where "sid" are item IDs and "pid" are user IDs:
+The implementation expects the following data formats where "sid" are item IDs and "pid" are user IDs:
 
   
 
