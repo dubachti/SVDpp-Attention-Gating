@@ -185,4 +185,4 @@ def make_submission(pred_fn: Callable[[np.ndarray, np.ndarray], np.ndarray], fil
     pids = pids.astype(int).values
 
     df["rating"] = pred_fn(sids, pids)
-    df.to_csv(f"experiments_data/{filename}", index=False)
+    df.to_csv(f"{filename}", index=False)
