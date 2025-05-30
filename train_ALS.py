@@ -42,7 +42,6 @@ def main():
     model = ALS(
         device="cuda" if torch.cuda.is_available() else "cpu",
         train_mat=train_mat,
-        tbr_df=None
     )
 
     print(" > Training model...")
