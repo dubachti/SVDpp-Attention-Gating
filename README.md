@@ -36,6 +36,7 @@ python train_SVDpp.py
 ```sh
 python train_ALS.py
 ```
+Each of the scripts will also save the model state, print the best acheived RMSE on the validation set and create a submission file for the competition.
 
 ### Hyperparameter Tuning
 Grid search for hyperparameter optimization can be performed using:
@@ -52,6 +53,14 @@ Grid search on **SVDpp++**  can be performed using the **SVDppAG** script with d
 
 ### Dataset
 This project uses a dataset consisting of explicit user-item ratings and implicit user feedback. The scripts expect the following files in the `data/` directory:
-- `train_ratings.csv`: Contains explicit ratings with columns like `sid`, `pid`, `rating`.
-- `train_tbr.csv`: Contains implicit feedback with columns like `sid`, `pid`.
-- `sample_submission.csv`: Used for generating prediction files.
+- `train_ratings.csv`: Contains explicit ratings with columns `sid`, `pid`, `rating`.
+- `train_tbr.csv`: Contains implicit feedback with columns `sid`, `pid`.
+- `sample_submission.csv`: Used for generating prediction files for the competition.
+
+### Results
+Below we provide a summary of the results obtained from the models on the test set:
+| Model     | RMSE   | Std     |
+|-----------|--------|---------|
+| ALS       | 0.856  | 1.22e-4 |
+| SVD++     | 0.853  | 3.03e-4 |
+| **SVDppAG**   | **0.844**  | **1.22e-4** |
