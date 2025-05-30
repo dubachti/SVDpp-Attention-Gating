@@ -11,8 +11,6 @@ The goal of SVDppAG is to improve prediction accuracy in collaborative filtering
 
 ### Setup
 ```sh
-git clone git@github.com:dubachti/SVDpp-Attention-Gating.git
-cd SVDpp-Attention-Gating
 pip install -r requirements.txt
 ```
 
