@@ -1,24 +1,35 @@
 import torch
 from sklearn.model_selection import train_test_split
-from sklearn.model_selection import train_test_split
-from src.dataloader import Dataloader
-from src.torch_models import ALS
-import src.ALS_helpers as ALS_helpers
 import pandas as pd
 import numpy as np
+from datetime import datetime
+import os
+import sys
+# add project root to sys.path to import local modules
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+from src.dataloader import Dataloader
+from src.models.ALS import *
 
-RESULTS_FILE = "gs_results/ALS_grid_search.csv"
-save_to_file = False
+RANDOM_STATE = 42
+TEST_SIZE = 0.1
+VALIDATION_SIZE = 0.1
 
 # Parameters over which to perform grid search
 LAMBDAS = [16, 18, 20, 22, 24]
 RANKS = [4, 8, 12, 16, 20, 24]
 ITERATIONS = [50]
 
+
+datetime_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+RESULTS_DIR = "grid_search_results"
+os.makedirs(RESULTS_DIR, exist_ok=True)
+RESULTS_FILE = f"{RESULTS_DIR}/{datetime_str}_ALS_grid_search_results.csv"
+
 # Enable normalization along either columns, rows, or none at all
 normalize_rows = False
 normalize_columns = True
-
 
 def evaluate_model(model, lam, rank, iterations, mean, std, ratings_valid):
     
@@ -28,30 +39,29 @@ def evaluate_model(model, lam, rank, iterations, mean, std, ratings_valid):
 
     # Recover initial ratings by reverting the normalization
     if normalize_rows:
-        predictions_matrix = ALS_helpers.recover_matrix_rows(predictions_matrix, mean, std)
+        predictions_matrix = recover_matrix_rows(predictions_matrix, mean, std)
     elif normalize_columns:
-        predictions_matrix = ALS_helpers.recover_matrix_columns(predictions_matrix, mean, std)
+        predictions_matrix = recover_matrix_columns(predictions_matrix, mean, std)
 
     # Compute and return the loss of the current model
-    loss = ALS_helpers.evaluate_prediction_matrix(ratings_valid, predictions_matrix)
+    loss = evaluate_prediction_matrix(ratings_valid, predictions_matrix)
     return loss
     
 def grid_search():
-
     # Load data
     print(" > Reading data...")
     ratings_df = Dataloader.load_train_ratings()
-    ratings_train_valid, _ = train_test_split(ratings_df, test_size=0.1, random_state=42)
-    ratings_train, ratings_valid = train_test_split(ratings_train_valid, test_size=0.1/0.9, random_state=42)
+    ratings_temp, _ = train_test_split(ratings_df, test_size=TEST_SIZE, random_state=RANDOM_STATE)    
+    ratings_train, ratings_valid = train_test_split(ratings_temp, test_size=VALIDATION_SIZE/(1-TEST_SIZE), random_state=RANDOM_STATE)
     init_train_mat = torch.tensor(ratings_train.pivot(index="sid", columns="pid", values="rating").values, dtype=torch.float32)
     print(" > Data read completed")
 
     # Normalize and center data if enabled
     if normalize_rows:
-        train_mat, mean, std = ALS_helpers.center_and_normalize_rows(init_train_mat)
+        train_mat, mean, std = center_and_normalize_rows(init_train_mat)
         print("(Normalized and centered each row)")
     elif normalize_columns:
-        train_mat, mean, std = ALS_helpers.center_and_normalize_columns(init_train_mat)
+        train_mat, mean, std = center_and_normalize_columns(init_train_mat)
         print("(Normalized and centered each column)")
     else:
         train_mat, mean, std = init_train_mat, 0, 0
@@ -93,45 +103,44 @@ def grid_search():
     print(f" > GRID SEARCH END: best parameters are {best_params} with loss={min_loss}")
 
     # Save parameter configuration and losses to a CSV file
-    if save_to_file:
-        results_df = pd.DataFrame(results_list)
-        try:
-            results_df.to_csv(RESULTS_FILE, index=False)
-            print(f"\nGrid search results saved to {RESULTS_FILE}")
-        except IOError as e:
-            print(f"Error saving results to CSV: {e}")
-        except Exception as e:
-            print(f"An error occurred while processing results: {e}")
+    results_df = pd.DataFrame(results_list)
+    try:
+        results_df.to_csv(RESULTS_FILE, index=False)
+        print(f"\nGrid search results saved to {RESULTS_FILE}")
+    except IOError as e:
+        print(f"Error saving results to CSV: {e}")
+    except Exception as e:
+        print(f"An error occurred while processing results: {e}")
 
     print(" > GRID SEARCH END")
 
     return best_params
 
-def three_runs_with_best_params(best_params):
+def n_runs_with_best_params(best_params, n_runs=3):
 
     # Read data
     print(" > Reading data...")
     ratings_df = Dataloader.load_train_ratings()
-    ratings_train_valid, ratings_test = train_test_split(ratings_df, test_size=0.1, random_state=42)
-    ratings_train, ratings_valid = train_test_split(ratings_train_valid, test_size=0.1/0.9, random_state=42)
+
+    ratings_temp, ratings_test = train_test_split(ratings_df, test_size=TEST_SIZE, random_state=RANDOM_STATE)    
+    ratings_train, _ = train_test_split(ratings_temp, test_size=VALIDATION_SIZE/(1-TEST_SIZE), random_state=RANDOM_STATE)
+    
     init_train_mat = torch.tensor(ratings_train.pivot(index="sid", columns="pid", values="rating").values, dtype=torch.float32)
     print(" > Data read completed")
 
     # Normalize and center data if enabled
     if normalize_rows:
-        train_mat, mean, std = ALS_helpers.center_and_normalize_rows(init_train_mat)
+        train_mat, mean, std = center_and_normalize_rows(init_train_mat)
         print("(Normalized and centered each row)")
     elif normalize_columns:
-        train_mat, mean, std = ALS_helpers.center_and_normalize_columns(init_train_mat)
+        train_mat, mean, std = center_and_normalize_columns(init_train_mat)
         print("(Normalized and centered each column)")
     else:
         train_mat, mean, std = init_train_mat, 0, 0
 
     # Train (on init_train_mat) and evaluate (on ratings_test) three times with new seed each time
-    nof_runs = 3
     losses = []
-    for i in range(nof_runs):
-        
+    for i in range(n_runs):
         seed = torch.randint(1, 100000, (1,))
         torch.manual_seed(seed)
         np.random.seed(seed)
@@ -144,7 +153,7 @@ def three_runs_with_best_params(best_params):
         print(f" > LOSS WITH {best_params} ON TEST DATA: {test_loss}  [seed={seed}]")
 
     # Print the average loss and standard deviation over all trained models
-    print(f" >>> LOSS OVER {nof_runs} RUNS: mean={np.mean(losses)}, std={np.std(losses)}")
+    print(f" >>> LOSS OVER {n_runs} RUNS: mean={np.mean(losses)}, std={np.std(losses)}")
 
 if __name__ == "__main__":
 
@@ -152,4 +161,4 @@ if __name__ == "__main__":
     best_params = grid_search()
 
     # Use the best parameters from grid search and evaluate the model
-    three_runs_with_best_params(best_params)
+    n_runs_with_best_params(best_params)

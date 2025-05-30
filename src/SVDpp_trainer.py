@@ -127,6 +127,40 @@ class SVDppTrainer:
         avg_mse = total_mse / num_samples if num_samples > 0 else 0
         rmse = math.sqrt(avg_mse)
         return rmse
+    
+    def evaluate_on_loader(self, data_loader: DataLoader) -> float:
+        """eval on a given data loader"""
+        self.model.eval()
+        total_mse = 0.0
+        num_samples = 0
+
+        with torch.no_grad():
+            pbar = tqdm(data_loader, desc="Evaluating on loader", leave=False, disable=not self.verbose)
+            for sid_batch, pid_batch, rating_batch, implicit_pids_batch, implicit_lengths_batch in pbar:
+                sid_batch = sid_batch.to(self.device)
+                pid_batch = pid_batch.to(self.device)
+                rating_batch = rating_batch.to(self.device)
+                implicit_pids_batch = implicit_pids_batch.to(self.device)
+                implicit_lengths_batch = implicit_lengths_batch.to(self.device)
+
+                batch_size = sid_batch.size(0)
+
+                predictions = self.model(SIDs=sid_batch, 
+                                         PIDs=pid_batch, 
+                                         implicit_PIDs=implicit_pids_batch, 
+                                         implicit_lengths=implicit_lengths_batch)
+                predictions = torch.clamp(predictions, self.rating_min, self.rating_max)
+
+                mse = F.mse_loss(predictions, rating_batch, reduction='sum')
+                total_mse += mse.item()
+                num_samples += batch_size
+                batch_rmse = math.sqrt(mse.item() / batch_size) if batch_size > 0 else 0
+                pbar.set_postfix({'batch_rmse': f'{batch_rmse:.4f}'})
+
+        # overall RMSE
+        avg_mse = total_mse / num_samples if num_samples > 0 else 0
+        rmse = math.sqrt(avg_mse)
+        return rmse
 
     def train(self, num_epochs: int) -> float:
         """

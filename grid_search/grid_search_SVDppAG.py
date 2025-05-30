@@ -1,3 +1,9 @@
+"""
+Grid Search for SVD++ with Attention and Gating Mechanisms
+
+Stores results to a CSV file in the 'grid_search_results' directory.
+"""
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -9,11 +15,18 @@ from datetime import datetime
 import numpy as np
 import itertools
 import os
+import sys
+
+# add project root to sys.path to import local modules
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from src.dataloader import Dataloader as CSVLoader
-from src.torch_dataset import SVDppDataset, svdpp_collate_fn
-from src.torch_models import SVDppAG
-from src.torch_trainer import SVDppTrainer
+from src.SVDpp_dataset import SVDppDataset, svdpp_collate_fn
+from src.models.SVDpp import SVDpp
+from src.models.SVDppAG import SVDppAG
+from src.SVDpp_trainer import SVDppTrainer
 
 # config
 RANDOM_STATE = 42
@@ -32,7 +45,7 @@ MIN_DELTA_IMPROVEMENT = 0.0001
 
 # grid search hyperparams
 SEARCH_SPACE_GRID = {
-    'n_factors': [4, 8, 16, 32, 64, 128, 256, 512, 1024],
+    'n_factors': [4, 8, 16, 32, 64, 128, 256],
     'reg_lambda': [0.005, 0.01, 0.02, 0.04],
     'use_attn': [True], # used for ablation study
     'use_gating': [True], # used for ablation study
@@ -40,7 +53,7 @@ SEARCH_SPACE_GRID = {
 }
 
 datetime_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-RESULTS_DIR = "experiments_data"
+RESULTS_DIR = "grid_search_results"
 os.makedirs(RESULTS_DIR, exist_ok=True)
 RESULTS_FILE = f"{RESULTS_DIR}/{datetime_str}_{MODEL_CLASS.__name__}_grid_search_results.csv"
 

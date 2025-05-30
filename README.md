@@ -1,175 +1,57 @@
+# SVDppAG: Enhancing SVD++ with Attention and Gating
 
-# Implementations for Recommendation Systems
+### Overview
+This repository implements SVDppAG, an enhanced version of the SVD++ collaborative filtering model. SVD++ is a well-regarded matrix factorization technique that leverages both explicit user ratings and implicit user feedback for recommendations. However, its standard approach to aggregating implicit feedback treats all such interactions equally, and the fusion of this implicit signal with the explicit user preference is a simple summation.
 
-  
+SVDppAG addresses these limitations by introducing two key mechanisms:
+1.  **Attention Mechanism**: This allows the model to dynamically weight implicit user-item interactions based on their relevance to the user's preferences, enabling a more focused aggregation of the implicit signal.
+2.  **Gating Mechanism**: This provides an adaptive way to fuse the explicit user signal with the attended implicit item signal, allowing the model to learn the optimal influence of each component.
 
-A PyTorch implementation of the SVDppAG model introduced in the paper "SVDppAG: Enhancing SVD++ with Attention and Gating".
+The goal of SVDppAG is to improve prediction accuracy in collaborative filtering tasks by enabling the model to better understand the nuanced relationships within user-item interactions.
 
-  
-
-## Overview
-
-  
-
-This project contains an implementation of the SVDppAG model introduced in the paper "SVDppAG: Enhancing SVD++ with Attention and Gating" which incoorporates explicit ratings and implicit feedback for user-item ratings prediction. Additionally, it includes implementations of state-of-the-art models for recommendation systems based on earlier papers for performance comparison.
-
-  
-
-## Features
-
-  
-
-### Models Implemented
-
-  
-
-- **SVD++ with Attention and Gating (SVDppAG)**: Advanced variant with attention mechanisms and gating networks
-
-- **Basic Matrix Factorization (BasicMF)**: Standard collaborative filtering with user and item embeddings
-
-- **SVD++**: Enhanced matrix factorization incorporating implicit feedback
-
-- **Asymmetric SVD (AsymmetricSVD)**: Alternative approach to implicit feedback integration
-
-- **Basic Implicit MF**: Matrix factorization specifically designed for implicit feedback
-
-- **Alternating Least Squares (ALS)**: Traditional optimization approach based on matrix factorization
-
-  
-
-### Key Features of SVDppAG
-
-
-- **Flexible Architecture**: Modular design allowing easy experimentation with different model variants
-
-- **GPU Acceleration**: Full CUDA support for training and inference
-
-- **Batch Processing**: Efficient batch processing for both training and inference
-
-  
-
-## Installation
-
-  
-
-```bash
-
-pip install torch pandas numpy scikit-learn tqdm
-
+### Setup
+```sh
+git clone git@github.com:dubachti/SVDpp-Attention-Gating.git
+cd SVDpp-Attention-Gating
+pip install -r requirements.txt
 ```
 
-  
+### Models
+- **ALS**: Alternating Least Squares implementation for collaborative filtering.
+- **SVD++**: implementation of the [SVD++](https://doi.org/10.1145/1401890.1401944) model.
+- **SVDppAG**: SVD++ model enhanced with attention and gating mechanisms.
 
-## Quick Start
 
-  
-
-### Running the Example
-
-  
-
-```bash
-
-python SVDppMLP_sample_training.py
-
+### Training
+Individual models can be trained using the following scripts:
+- **ALS**:
+```sh
+python train_ALS.py
+```
+- **SVD++**:
+```sh
+python train_SVDpp.py
+```
+- **SVDppAG**:
+```sh
+python train_SVDppAG.py
 ```
 
-  
-
-## Model Details
-
-  
-
-### SVD++ (Singular Value Decomposition Plus Plus)
-
-  
-
-The core SVD++ model predicts ratings using:
-
-  
-
-$$\hat{r}_{ui} = μ + b_u + b_i + q_i^T(p_u + |N(u)|^(-1/2) * Σ_{j∈N(u)} y_j)$$
-
-  
-
-Where:
-
-- $μ$: Global mean rating
-
-- $b_u$, $b_i$: User and item biases
-
-- $p_u$, $q_i$: User and item latent factors
-
-- $N(u)$: Set of items with implicit feedback from user u
-
-- $y_j$: Implicit item factors
-
-  
-
-## Data Format
-
-  
-
-The implementation expects the following data formats where "sid" are item IDs and "pid" are user IDs:
-
-  
-
-### Explicit Ratings (`train_ratings.csv`)
-
-```csv
-
-sid_pid,rating
-
-1_100,4.5
-
-1_101,3.0
-
-...
-
+### Hyperparameter Tuning
+Grid search for hyperparameter optimization can be performed using:
+- **ALS**:
+```sh
+python grid_search_ALS.py
+```
+- **SVDppAG**:
+```sh
+python grid_search_SVDppAG.py
 ```
 
-  
+Grid search on **SVDpp++**  can be performed using the **SVDppAG** script with deactivated attention and gating.
 
-### Implicit Feedback (`train_tbr.csv`)
-
-```csv
-
-sid,pid
-
-1,200
-
-1,201
-
-...
-
-```
-
-  
-
-## Hyperparameter Tuning
-
-  
-
-Key hyperparameters to tune:
-
-  
-
-- `embedding_dim`: Dimensionality of latent factors (typically 20-200)
-
-- `learning_rate`: Learning rate for optimization (typically 0.001-0.01)
-
-- `reg_lambda`: L2 regularization strength (typically 0.001-0.1)
-
-  
-
-## Advanced Features
-
-  
-
-### Flexible Implicit Feedback
-
-- Variable-length implicit feedback lists
-
-- Automatic padding and masking
-
-- Normalization by feedback count
+### Dataset
+This project uses a dataset consisting of explicit user-item ratings and implicit user feedback. The scripts expect the following files in the `data/` directory:
+- `train_ratings.csv`: Contains explicit ratings with columns like `sid`, `pid`, `rating`.
+- `train_tbr.csv`: Contains implicit feedback with columns like `sid`, `pid`.
+- `sample_submission.csv`: Used for generating prediction files.
