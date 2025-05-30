@@ -36,7 +36,7 @@ python train_SVDpp.py
 ```sh
 python train_ALS.py
 ```
-Each of the scripts will also save the model state, print the best acheived RMSE on the validation set and create a submission file for the competition.
+Each of the scripts will print the best achieved RMSE on the validation set and create a submission file for the competition.
 
 ### Hyperparameter Tuning
 Grid search for hyperparameter optimization can be performed using:
