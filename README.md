@@ -41,11 +41,11 @@ python train_SVDppAG.py
 Grid search for hyperparameter optimization can be performed using:
 - **ALS**:
 ```sh
-python grid_search_ALS.py
+python grid_search/grid_search_ALS.py
 ```
 - **SVDppAG**:
 ```sh
-python grid_search_SVDppAG.py
+python grid_search/grid_search_SVDppAG.py
 ```
 
 Grid search on **SVDpp++**  can be performed using the **SVDppAG** script with deactivated attention and gating.
