@@ -15,35 +15,37 @@ pip install -r requirements.txt
 ```
 
 ### Models
+- **SVDppAG**: SVD++ model enhanced with attention and gating mechanisms.
+
+Some additional models are also included for comparison:
 - **ALS**: Alternating Least Squares implementation for collaborative filtering.
 - **SVD++**: implementation of the [SVD++](https://doi.org/10.1145/1401890.1401944) model.
-- **SVDppAG**: SVD++ model enhanced with attention and gating mechanisms.
 
 
 ### Training
 Individual models can be trained using the following scripts:
-- **ALS**:
+- **SVDppAG**:
 ```sh
-python train_ALS.py
+python train_SVDppAG.py
 ```
 - **SVD++**:
 ```sh
 python train_SVDpp.py
 ```
-- **SVDppAG**:
+- **ALS**:
 ```sh
-python train_SVDppAG.py
+python train_ALS.py
 ```
 
 ### Hyperparameter Tuning
 Grid search for hyperparameter optimization can be performed using:
-- **ALS**:
-```sh
-python grid_search/grid_search_ALS.py
-```
 - **SVDppAG**:
 ```sh
 python grid_search/grid_search_SVDppAG.py
+```
+- **ALS**:
+```sh
+python grid_search/grid_search_ALS.py
 ```
 
 Grid search on **SVDpp++**  can be performed using the **SVDppAG** script with deactivated attention and gating.
