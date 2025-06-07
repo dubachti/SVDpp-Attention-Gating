@@ -11,9 +11,6 @@ import time
 
 
 class SVDppTrainer:
-    """
-    add some docstring here
-    """
     def __init__(self,
                  model: nn.Module,
                  optimizer: optim.Optimizer,
@@ -239,8 +236,6 @@ class SVDppTrainer:
     def save_model(self, filepath: str):
         """
         save te model state dictionary to a file
-
-        not tested
         """
         dir_path = os.path.dirname(filepath)
         if dir_path:
