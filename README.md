@@ -1,6 +1,6 @@
 # SVDppAG: Enhancing SVD++ with Attention and Gating
 
-This repository contains the implementation for the methods described in the [project report](docs/SVDppAG.pdf).
+This repository contains the implementation for the methods described in the [SVDppAG report](docs/SVDppAG.pdf).
 
 ## Overview
 
