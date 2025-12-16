@@ -1,0 +1,19 @@
+# ALS Model Configuration
+# ======================
+
+model:
+  embedding_dim: 12
+  reg_lambda: 20
+  n_iterations: 50
+
+data:
+  test_size: 0.1
+  validation_size: 0.1
+  random_state: 42
+
+preprocessing:
+  normalize_rows: false
+  normalize_columns: true
+
+output:
+  submission_file: "ALS_submission.csv"

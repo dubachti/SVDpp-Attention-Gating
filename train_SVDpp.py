@@ -8,6 +8,7 @@ from src.models.SVDpp import SVDpp
 from src.SVDpp_trainer import SVDppTrainer
 from src.dataloader import Dataloader as CSVLoader
 from src.eval import predict_SVDpp
+from src.config import load_svdpp_config
 from datetime import datetime
 from torch import nn
 import torch
@@ -15,18 +16,38 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 from sklearn.model_selection import train_test_split as sklearn_split
 
-BATCH_SIZE = 1024
-EMBEDDING_DIM = 256
-LEARNING_RATE = 0.001
-REG_LAMBDA = 0.01
-NUM_EPOCHS = 40
-EARLY_STOPPING_PATIENCE = 5
-MIN_DELTA_IMPROVEMENT = 0.0001
-TEST_SIZE = 0.1
-VALIDATION_SIZE = 0.1
-RANDOM_STATE = 42
 
 def main():
+    # Load configuration
+    config = load_svdpp_config()
+    
+    # Model hyperparameters
+    EMBEDDING_DIM = config['model']['embedding_dim']
+    
+    # Training hyperparameters
+    BATCH_SIZE = config['training']['batch_size']
+    LEARNING_RATE = config['training']['learning_rate']
+    REG_LAMBDA = config['training']['reg_lambda']
+    NUM_EPOCHS = config['training']['num_epochs']
+    NUM_WORKERS = config['training']['num_workers']
+    
+    # Early stopping
+    EARLY_STOPPING_PATIENCE = config['early_stopping']['patience']
+    MIN_DELTA_IMPROVEMENT = config['early_stopping']['min_delta']
+    
+    # Scheduler
+    SCHEDULER_FACTOR = config['scheduler']['factor']
+    SCHEDULER_PATIENCE = config['scheduler']['patience']
+    SCHEDULER_MIN_LR = config['scheduler']['min_lr']
+    
+    # Data split parameters
+    TEST_SIZE = config['data']['test_size']
+    VALIDATION_SIZE = config['data']['validation_size']
+    RANDOM_STATE = config['data']['random_state']
+    
+    # Output
+    MODEL_FILE = config['output']['model_file']
+    
     # 1. load data
     print(" > READING DATA...")
     ratings_df = CSVLoader.load_train_ratings()
@@ -44,9 +65,9 @@ def main():
     valid_dataset = SVDppDataset(ratings_valid, tbr_df)
     test_dataset = SVDppDataset(ratings_test, tbr_df)
 
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=svdpp_collate_fn, num_workers=2)
-    valid_loader = DataLoader(valid_dataset, batch_size=BATCH_SIZE*2, shuffle=False, collate_fn=svdpp_collate_fn, num_workers=2)
-    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE*2, shuffle=False, collate_fn=svdpp_collate_fn, num_workers=2)
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=svdpp_collate_fn, num_workers=NUM_WORKERS)
+    valid_loader = DataLoader(valid_dataset, batch_size=BATCH_SIZE*2, shuffle=False, collate_fn=svdpp_collate_fn, num_workers=NUM_WORKERS)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE*2, shuffle=False, collate_fn=svdpp_collate_fn, num_workers=NUM_WORKERS)
     print(" > DATA LOADED")
 
     model = SVDpp(
@@ -58,7 +79,7 @@ def main():
 
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     criterion = nn.MSELoss(reduction='sum')
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-6)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=SCHEDULER_FACTOR, patience=SCHEDULER_PATIENCE, min_lr=SCHEDULER_MIN_LR)
 
     # 4. train
     trainer = SVDppTrainer(
@@ -80,7 +101,7 @@ def main():
     test_rmse = trainer.evaluate_on_loader(test_loader)
     print(f"Test RMSE: {test_rmse:.4f}")
 
-    trainer.save_model("svdpp_model.pth")
+    trainer.save_model(MODEL_FILE)
 
     # 5. predict
     print("Predicting submission data...")

@@ -1,0 +1,29 @@
+# SVD++ AG Grid Search Configuration
+# ===================================
+
+data:
+  test_size: 0.1
+  validation_size: 0.1
+  random_state: 42
+  batch_size: 1024
+  num_workers: 2
+
+training:
+  max_epochs: 40
+  early_stopping_patience: 5
+  min_delta: 0.0001
+
+scheduler:
+  factor: 0.5
+  patience: 3
+  min_lr: 0.000001
+
+search_space:
+  n_factors: [4, 8, 16, 32, 64, 128, 256]
+  reg_lambda: [0.005, 0.01, 0.02, 0.04]
+  use_attn: [true]
+  use_gating: [true]
+  learning_rate: [0.0001, 0.001, 0.01]
+
+output:
+  results_dir: "grid_search_results"

@@ -1,0 +1,19 @@
+# ALS Grid Search Configuration
+# =============================
+
+data:
+  test_size: 0.1
+  validation_size: 0.1
+  random_state: 42
+
+preprocessing:
+  normalize_rows: false
+  normalize_columns: true
+
+search_space:
+  lambdas: [16, 18, 20, 22, 24]
+  ranks: [4, 8, 12, 16, 20, 24]
+  iterations: [50]
+
+output:
+  results_dir: "grid_search_results"

@@ -27,33 +27,36 @@ from src.SVDpp_dataset import SVDppDataset, svdpp_collate_fn
 from src.models.SVDpp import SVDpp
 from src.models.SVDppAG import SVDppAG
 from src.SVDpp_trainer import SVDppTrainer
+from src.config import load_grid_search_svdppag_config
+
+# Load configuration
+config = load_grid_search_svdppag_config()
 
 # config
-RANDOM_STATE = 42
+RANDOM_STATE = config['data']['random_state']
 MODEL_CLASS = SVDppAG
 
 # data loading
-TEST_SIZE = 0.1
-VALIDATION_SIZE = 0.1
-BATCH_SIZE = 1024
-NUM_WORKERS = 2
+TEST_SIZE = config['data']['test_size']
+VALIDATION_SIZE = config['data']['validation_size']
+BATCH_SIZE = config['data']['batch_size']
+NUM_WORKERS = config['data']['num_workers']
 
 # early stopping
-MAX_TRAINING_EPOCHS = 40
-EARLY_STOPPING_PATIENCE = 5
-MIN_DELTA_IMPROVEMENT = 0.0001
+MAX_TRAINING_EPOCHS = config['training']['max_epochs']
+EARLY_STOPPING_PATIENCE = config['training']['early_stopping_patience']
+MIN_DELTA_IMPROVEMENT = config['training']['min_delta']
+
+# scheduler
+SCHEDULER_FACTOR = config['scheduler']['factor']
+SCHEDULER_PATIENCE = config['scheduler']['patience']
+SCHEDULER_MIN_LR = config['scheduler']['min_lr']
 
 # grid search hyperparams
-SEARCH_SPACE_GRID = {
-    'n_factors': [4, 8, 16, 32, 64, 128, 256],
-    'reg_lambda': [0.005, 0.01, 0.02, 0.04],
-    'use_attn': [True], # used for ablation study
-    'use_gating': [True], # used for ablation study
-    'learning_rate': [0.0001, 0.001, 0.01],
-}
+SEARCH_SPACE_GRID = config['search_space']
 
 datetime_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-RESULTS_DIR = "grid_search_results"
+RESULTS_DIR = config['output']['results_dir']
 os.makedirs(RESULTS_DIR, exist_ok=True)
 RESULTS_FILE = f"{RESULTS_DIR}/{datetime_str}_{MODEL_CLASS.__name__}_grid_search_results.csv"
 
@@ -125,7 +128,7 @@ def objective_function(n_factors, reg_lambda, use_attn, use_gating, learning_rat
 
         optimizer = optim.Adam(model.parameters(), lr=learning_rate)
         criterion = nn.MSELoss(reduction='sum') 
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-6)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=SCHEDULER_FACTOR, patience=SCHEDULER_PATIENCE, min_lr=SCHEDULER_MIN_LR)
 
         trainer = SVDppTrainer(
             model=model,

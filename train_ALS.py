@@ -1,5 +1,4 @@
-"""
-Training script for the Alternating Least Squares (ALS) model.
+"""Training script for the Alternating Least Squares (ALS) model.
 
 Train the model, evaluate on test set, and generate predictions for competition submission.
 """
@@ -8,19 +7,30 @@ import torch
 from sklearn.model_selection import train_test_split
 from src.dataloader import Dataloader
 from src.models.ALS import *
-
-REG_LAMBDA = 20
-EMBDDING_DIM = 12
-N_ITERATIONS = 50
-TEST_SIZE = 0.1
-VALIDATION_SIZE = 0.1
-RANDOM_STATE = 42
-
-NORMALIZE_ROWS = False
-NORMALIZE_COLUMNS = True
+from src.config import load_als_config
 
 
 def main():
+    # Load configuration
+    config = load_als_config()
+    
+    # Model hyperparameters
+    REG_LAMBDA = config['model']['reg_lambda']
+    EMBEDDING_DIM = config['model']['embedding_dim']
+    N_ITERATIONS = config['model']['n_iterations']
+    
+    # Data split parameters
+    TEST_SIZE = config['data']['test_size']
+    VALIDATION_SIZE = config['data']['validation_size']
+    RANDOM_STATE = config['data']['random_state']
+    
+    # Preprocessing
+    NORMALIZE_ROWS = config['preprocessing']['normalize_rows']
+    NORMALIZE_COLUMNS = config['preprocessing']['normalize_columns']
+    
+    # Output
+    SUBMISSION_FILE = config['output']['submission_file']
+    
     # Load data
     print(" > READING DATA...")
     ratings_df = Dataloader.load_train_ratings()
@@ -46,7 +56,7 @@ def main():
 
     print(" > Training model...")
                 
-    model.train(lam=REG_LAMBDA, rank=EMBDDING_DIM, iterations=N_ITERATIONS)
+    model.train(lam=REG_LAMBDA, rank=EMBEDDING_DIM, iterations=N_ITERATIONS)
     predictions_matrix = model.get_predictions_matrix()
 
     if NORMALIZE_ROWS:
@@ -62,7 +72,7 @@ def main():
     # Create submission
     print(" > CREATING SUBMISSION...")
     pred_fn = lambda sids, pids: predictions_matrix[sids, pids]
-    make_submission(pred_fn, "ALS_submission.csv")
+    make_submission(pred_fn, SUBMISSION_FILE)
 
     print(" > END")
 

@@ -11,25 +11,29 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 from src.dataloader import Dataloader
 from src.models.ALS import *
+from src.config import load_grid_search_als_config
 
-RANDOM_STATE = 42
-TEST_SIZE = 0.1
-VALIDATION_SIZE = 0.1
+# Load configuration
+config = load_grid_search_als_config()
+
+# Data split parameters
+RANDOM_STATE = config['data']['random_state']
+TEST_SIZE = config['data']['test_size']
+VALIDATION_SIZE = config['data']['validation_size']
 
 # Parameters over which to perform grid search
-LAMBDAS = [16, 18, 20, 22, 24]
-RANKS = [4, 8, 12, 16, 20, 24]
-ITERATIONS = [50]
+LAMBDAS = config['search_space']['lambdas']
+RANKS = config['search_space']['ranks']
+ITERATIONS = config['search_space']['iterations']
 
+# Preprocessing
+normalize_rows = config['preprocessing']['normalize_rows']
+normalize_columns = config['preprocessing']['normalize_columns']
 
 datetime_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-RESULTS_DIR = "grid_search_results"
+RESULTS_DIR = config['output']['results_dir']
 os.makedirs(RESULTS_DIR, exist_ok=True)
 RESULTS_FILE = f"{RESULTS_DIR}/{datetime_str}_ALS_grid_search_results.csv"
-
-# Enable normalization along either columns, rows, or none at all
-normalize_rows = False
-normalize_columns = True
 
 def evaluate_model(model, lam, rank, iterations, mean, std, ratings_valid):
     
